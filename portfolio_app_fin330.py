@@ -81,6 +81,11 @@ show_opportunity_set = st.sidebar.checkbox("Show Opportunity Set", value=True)
 show_efficient_frontier = st.sidebar.checkbox("Show Efficient Frontier", value=False)
 show_MVP = st.sidebar.checkbox("Show Minimum Variance Portfolio", value=True)
 show_CAL = st.sidebar.checkbox("Show CAL", value=True)
+allow_short = st.sidebar.checkbox(
+    "Extend Curve Beyond B and S (Short Sales)",
+    value=True,
+    help="Plots portfolios with negative weights so the full opportunity set, including the lower inefficient branch, is visible.",
+)
 
 st.sidebar.markdown("---")
 st.sidebar.info("💡 Adjust the parameters to see how they affect the optimal portfolio.")
@@ -144,9 +149,15 @@ try:
     alloc_S = y_star * w_S
     alloc_rf = 1 - y_star
 
-    # ---------- Opportunity set (extended to include the MVP if it needs short sales) ----------
-    w_low = min(0.0, w_B_min)
-    w_high = max(1.0, w_B_min)
+    # ---------- Opportunity set ----------
+    if allow_short:
+        # Extend past both assets so the lower (inefficient) branch is clearly visible
+        w_low = min(-0.5, w_B_min - 0.5)
+        w_high = max(1.5, w_B_min + 0.5)
+    else:
+        # No short sales, but always include the MVP
+        w_low = min(0.0, w_B_min)
+        w_high = max(1.0, w_B_min)
     weights_B = np.linspace(w_low, w_high, 400)
     weights_S = 1 - weights_B
     E_portfolio = weights_B * E_rB + weights_S * E_rS
@@ -321,10 +332,6 @@ try:
             }
         )
         st.dataframe(results_MVP, hide_index=True, use_container_width=True)
-        st.latex(
-            r"w_{B,\min} = \frac{\sigma_S^2 - \text{Cov}(r_B, r_S)}"
-            r"{\sigma_B^2 + \sigma_S^2 - 2\,\text{Cov}(r_B, r_S)}"
-        )
         if mvp_short_sale:
             st.warning("⚠️ The MVP requires short selling one of the assets with these inputs.")
 
